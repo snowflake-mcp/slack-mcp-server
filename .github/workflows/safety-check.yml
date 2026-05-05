@@ -19,7 +19,9 @@ jobs:
       - name: Get changed lines in this PR
         id: diff
         run: |
-          git diff origin/main...HEAD -- '*.py' '*.sh' '*.yml' '*.yaml' '*.sql' > pr_diff.txt
+          # Exclude .github/ so workflow files don't trigger their own pattern definitions
+          git diff origin/main...HEAD -- '*.py' '*.sh' '*.sql' \
+            ':(exclude).github/**' > pr_diff.txt
           echo "Diff captured (added lines only will be scanned)"
 
       - name: Scan for dangerous patterns
