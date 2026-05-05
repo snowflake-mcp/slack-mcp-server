@@ -15,6 +15,7 @@ Connects using your personal Slack session token — no admin approval or bot re
 | `search_messages` | Search messages across all channels |
 | `send_message` | Post to a channel or reply in a thread |
 | `send_direct_message` | Send a DM to any user by name or ID |
+| `delete_message` | Delete a message from a channel or DM |
 
 ---
 
@@ -39,7 +40,7 @@ You need two values from your active Slack web session: a **token** and a **cook
 
 #### Step 1 — Open Slack in Chrome
 
-Go to [https://workday.enterprise.slack.com](https://workday.enterprise.slack.com) and sign in. Click into any workspace (e.g. "Workday").
+Go to your enterprise Slack URL (e.g. `https://your-company.enterprise.slack.com`) and sign in. Click into any workspace.
 
 #### Step 2 — Open DevTools
 

@@ -143,6 +143,33 @@ class SlackServer(Server):
                         "required": ["user", "text"]
                     }
                 ),
+                Tool(
+                    name="delete_message",
+                    description=(
+                        "Delete a Slack message by its timestamp (ts). "
+                        "Works for both channel messages and direct messages. "
+                        "Provide either 'channel' (for channel messages) or 'user' (for DMs), plus the 'ts' of the message. "
+                        "You can only delete messages sent by yourself."
+                    ),
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "ts": {
+                                "type": "string",
+                                "description": "Timestamp of the message to delete, e.g. '1771341599.829259'"
+                            },
+                            "channel": {
+                                "type": "string",
+                                "description": "Channel name without # (for channel messages)"
+                            },
+                            "user": {
+                                "type": "string",
+                                "description": "Username or user ID (for DMs)"
+                            }
+                        },
+                        "required": ["ts"]
+                    }
+                ),
             ]
 
         @self.call_tool()
@@ -175,6 +202,12 @@ class SlackServer(Server):
                     result = self.db.send_direct_message(
                         arguments.get("user", ""),
                         arguments.get("text", ""),
+                    )
+                elif name == "delete_message":
+                    result = self.db.delete_message(
+                        arguments.get("ts", ""),
+                        channel=arguments.get("channel"),
+                        user=arguments.get("user"),
                     )
                 else:
                     result = {"error": f"Unknown tool: {name}"}

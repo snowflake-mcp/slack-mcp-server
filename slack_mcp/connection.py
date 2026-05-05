@@ -8,6 +8,7 @@ from tools.ReadThread import ReadThread
 from tools.SearchMessages import SearchMessages
 from tools.SendMessage import SendMessage
 from tools.SendDirectMessage import SendDirectMessage
+from tools.DeleteMessage import DeleteMessage
 
 truststore.inject_into_ssl()
 
@@ -16,7 +17,7 @@ logger = logging.getLogger('slack_connection')
 load_dotenv(find_dotenv())
 
 
-class SlackConnection(ReadChannel, ReadThread, SearchMessages, SendMessage, SendDirectMessage):
+class SlackConnection(ReadChannel, ReadThread, SearchMessages, SendMessage, SendDirectMessage, DeleteMessage):
     """Manages Slack API access using a user session token + cookie."""
 
     BASE_URL = "https://slack.com/api"
