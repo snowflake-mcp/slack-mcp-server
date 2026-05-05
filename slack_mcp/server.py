@@ -1,10 +1,13 @@
 import json
 import logging
+from pathlib import Path
 from typing import Any
 
 from mcp.server import Server
-from mcp.types import Tool, TextContent
+from mcp.types import Tool, TextContent, Resource, ReadResourceResult, TextResourceContents
 from connection import SlackConnection
+
+SKILL_MD_PATH = Path(__file__).parent / "resources" / "SKILL.md"
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -143,6 +146,14 @@ class SlackServer(Server):
                         "required": ["user", "text"]
                     }
                 ),
+                # --- FUTURE SCOPE: get_pending_questions ---
+                # Enables an AI Q&A workflow where Claude polls a channel for
+                # messages starting with a trigger prefix (e.g. "ask:") and
+                # auto-replies in-thread. Requires an LLM API (Anthropic/Ollama)
+                # to run as an automated bot. Re-enable when that is available.
+                # See: slack_mcp/tools/GetPendingQuestions.py
+                # ---------------------------------------------------
+
                 Tool(
                     name="delete_message",
                     description=(
@@ -203,6 +214,7 @@ class SlackServer(Server):
                         arguments.get("user", ""),
                         arguments.get("text", ""),
                     )
+                # FUTURE SCOPE: get_pending_questions (see list_tools comment)
                 elif name == "delete_message":
                     result = self.db.delete_message(
                         arguments.get("ts", ""),
@@ -218,6 +230,35 @@ class SlackServer(Server):
                 error_msg = f"Error executing {name}: {str(e)}"
                 logger.error(error_msg, exc_info=True)
                 return [TextContent(type="text", text=json.dumps({"error": error_msg}))]
+
+        @self.list_resources()
+        async def list_resources() -> list[Resource]:
+            return [
+                Resource(
+                    uri="slack://skill",
+                    name="Slack MCP Usage Guide",
+                    description=(
+                        "Usage guide and reference for all Slack MCP tools — "
+                        "covers routing logic, auth, channel resolution, formatting, and troubleshooting."
+                    ),
+                    mimeType="text/markdown",
+                )
+            ]
+
+        @self.read_resource()
+        async def read_resource(uri: str) -> ReadResourceResult:
+            if uri == "slack://skill":
+                content = SKILL_MD_PATH.read_text(encoding="utf-8")
+                return ReadResourceResult(
+                    contents=[
+                        TextResourceContents(
+                            uri=uri,
+                            mimeType="text/markdown",
+                            text=content,
+                        )
+                    ]
+                )
+            raise ValueError(f"Unknown resource: {uri}")
 
     def __del__(self):
         if hasattr(self, 'db'):
