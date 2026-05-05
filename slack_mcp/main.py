@@ -3,7 +3,7 @@ Slack Model Context Protocol (MCP) Server
 
 This server enables AI assistants to interact with Slack through
 the Model Context Protocol (MCP). It uses the slk-read CLI to
-access the enterprise Slack workspace (workday.enterprise.slack.com).
+access your enterprise Slack workspace.
 """
 import asyncio
 import logging

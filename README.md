@@ -15,6 +15,7 @@ Connects using your personal Slack session token — no admin approval or bot re
 | `search_messages` | Search messages across all channels |
 | `send_message` | Post to a channel or reply in a thread |
 | `send_direct_message` | Send a DM to any user by name or ID |
+| `delete_message` | Delete a message from a channel or DM |
 
 ---
 
@@ -39,7 +40,7 @@ You need two values from your active Slack web session: a **token** and a **cook
 
 #### Step 1 — Open Slack in Chrome
 
-Go to [https://workday.enterprise.slack.com](https://workday.enterprise.slack.com) and sign in. Click into any workspace (e.g. "Workday").
+Go to your enterprise Slack URL (e.g. `https://your-company.enterprise.slack.com`) and sign in. Click into any workspace.
 
 #### Step 2 — Open DevTools
 
@@ -201,6 +202,49 @@ Send a DM to any Slack user.
 
 ---
 
+## SKILL.md — Behavioral Context for Claude
+
+The server exposes `slack_mcp/resources/SKILL.md` as an **MCP Resource** at `slack://skill`. This gives Claude behavioral instructions alongside the tools.
+
+### How it works
+
+```
+MCP Server exposes:
+  ├── Tools (read_channel, send_message, ...)   ← what Claude can DO
+  └── Resources (slack://skill → SKILL.md)      ← what Claude should KNOW
+```
+
+Without SKILL.md, Claude only sees dry tool schemas and has to guess when to use which tool, in what order, and how to handle edge cases.
+
+With SKILL.md, Claude gets explicit instructions:
+
+- **Routing rules** — e.g. use `search_messages` for cross-channel search, not `read_channel` in a loop
+- **Guardrails** — e.g. always confirm with the user before posting a thread reply
+- **Edge case handling** — e.g. if `enterprise_is_restricted` appears, don't retry with `conversations.list`
+- **Formatting guidance** — mrkdwn syntax so messages render correctly
+
+### Concrete example
+
+User says: *"Reply to the last message in #general saying the deployment is done"*
+
+| Without SKILL.md | With SKILL.md |
+|---|---|
+| Claude may immediately post without asking | Claude drafts the reply, shows it to you, waits for confirmation |
+| Claude may not know `thread_ts` is needed | Claude calls `read_channel` first to get `ts`, then replies in-thread |
+| Claude may use plain text | Claude uses mrkdwn formatting correctly |
+
+### Why resource over alternatives
+
+| Approach | Problem |
+|---|---|
+| Tool `description` field | Too short — can't fit routing logic or guardrails |
+| System prompt | Not owned by the server — rewritten every session |
+| **SKILL.md as a resource** | Travels with the server, versioned in git, always in sync with the tools |
+
+When you add a new tool, update `SKILL.md` in the same PR. The guardrails live next to the code that implements them.
+
+---
+
 ## Project Structure
 
 ```
@@ -209,12 +253,16 @@ slack-mcp-server/
 │   ├── main.py              # Entrypoint — starts the MCP server
 │   ├── server.py            # Tool definitions and request routing
 │   ├── connection.py        # SlackConnection — API calls, channel/user resolution
+│   ├── resources/
+│   │   └── SKILL.md         # Behavioral context exposed as an MCP resource
 │   └── tools/
 │       ├── ReadChannel.py
 │       ├── ReadThread.py
 │       ├── SearchMessages.py
 │       ├── SendMessage.py
-│       └── SendDirectMessage.py
+│       ├── SendDirectMessage.py
+│       ├── DeleteMessage.py
+│       └── GetPendingQuestions.py  # Future scope
 ├── requirements.txt
 ├── .env                     # Your credentials (gitignored)
 └── README.md
