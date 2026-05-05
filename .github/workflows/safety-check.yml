@@ -1,0 +1,70 @@
+name: Safety Check
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  scan-dangerous-commands:
+    name: Scan for dangerous deletion commands
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed lines in this PR
+        id: diff
+        run: |
+          git diff origin/main...HEAD -- '*.py' '*.sh' '*.yml' '*.yaml' '*.sql' > pr_diff.txt
+          echo "Diff captured (added lines only will be scanned)"
+
+      - name: Scan for dangerous patterns
+        run: |
+          # Extract only added lines from the diff (lines starting with +, excluding +++ header)
+          grep '^+' pr_diff.txt | grep -v '^+++' > added_lines.txt || true
+
+          FOUND=0
+
+          declare -A PATTERNS
+          PATTERNS["rm -rf / rm -r / rm -f"]='rm\s+-[rRfF]{1,3}'
+          PATTERNS["shutil.rmtree"]='shutil\.rmtree'
+          PATTERNS["os.remove / os.unlink"]='os\.(remove|unlink)\s*\('
+          PATTERNS["subprocess rm"]='subprocess.*(\"|\s)rm\s'
+          PATTERNS["DROP TABLE / DROP DATABASE"]='DROP\s+(TABLE|DATABASE|SCHEMA|INDEX)'
+          PATTERNS["DELETE FROM (SQL)"]='DELETE\s+FROM\s+\w'
+          PATTERNS["git push --force"]='git\s+push\s+.*(-f\b|--force)'
+          PATTERNS["git reset --hard"]='git\s+reset\s+--hard'
+          PATTERNS["git clean -f"]='git\s+clean\s+.*-f'
+          PATTERNS["rmdir /s (Windows)"]='rmdir\s+/[sS]'
+
+          echo "### Safety Scan Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          for label in "${!PATTERNS[@]}"; do
+            pattern="${PATTERNS[$label]}"
+            matches=$(grep -in -P "$pattern" added_lines.txt || true)
+            if [ -n "$matches" ]; then
+              echo "❌ **Dangerous pattern found: \`$label\`**" >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "$matches" >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "::error::Dangerous pattern detected: $label"
+              echo "$matches"
+              FOUND=1
+            fi
+          done
+
+          if [ $FOUND -eq 0 ]; then
+            echo "✅ No dangerous deletion commands found in this PR." >> $GITHUB_STEP_SUMMARY
+            echo "Safety check passed."
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "> ⚠️ Review the flagged lines carefully before merging." >> $GITHUB_STEP_SUMMARY
+            echo "Safety check failed — dangerous patterns detected in PR diff."
+            exit 1
+          fi
